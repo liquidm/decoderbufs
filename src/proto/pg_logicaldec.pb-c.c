@@ -342,13 +342,13 @@ const ProtobufCMessageDescriptor decoderbufs__datum_message__descriptor =
   (ProtobufCMessageInit) decoderbufs__datum_message__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor decoderbufs__row_message__field_descriptors[5] =
+static const ProtobufCFieldDescriptor decoderbufs__row_message__field_descriptors[6] =
 {
   {
     "commit_time",
     1,
     PROTOBUF_C_LABEL_OPTIONAL,
-    PROTOBUF_C_TYPE_SINT64,
+    PROTOBUF_C_TYPE_UINT64,
     offsetof(Decoderbufs__RowMessage, has_commit_time),
     offsetof(Decoderbufs__RowMessage, commit_time),
     NULL,
@@ -357,8 +357,20 @@ static const ProtobufCFieldDescriptor decoderbufs__row_message__field_descriptor
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "table",
+    "log_position",
     2,
+    PROTOBUF_C_LABEL_OPTIONAL,
+    PROTOBUF_C_TYPE_UINT64,
+    offsetof(Decoderbufs__RowMessage, has_log_position),
+    offsetof(Decoderbufs__RowMessage, log_position),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "table",
+    3,
     PROTOBUF_C_LABEL_OPTIONAL,
     PROTOBUF_C_TYPE_STRING,
     0,   /* quantifier_offset */
@@ -370,7 +382,7 @@ static const ProtobufCFieldDescriptor decoderbufs__row_message__field_descriptor
   },
   {
     "op",
-    3,
+    4,
     PROTOBUF_C_LABEL_OPTIONAL,
     PROTOBUF_C_TYPE_ENUM,
     offsetof(Decoderbufs__RowMessage, has_op),
@@ -382,7 +394,7 @@ static const ProtobufCFieldDescriptor decoderbufs__row_message__field_descriptor
   },
   {
     "new_tuple",
-    4,
+    5,
     PROTOBUF_C_LABEL_REPEATED,
     PROTOBUF_C_TYPE_MESSAGE,
     offsetof(Decoderbufs__RowMessage, n_new_tuple),
@@ -394,7 +406,7 @@ static const ProtobufCFieldDescriptor decoderbufs__row_message__field_descriptor
   },
   {
     "old_tuple",
-    5,
+    6,
     PROTOBUF_C_LABEL_REPEATED,
     PROTOBUF_C_TYPE_MESSAGE,
     offsetof(Decoderbufs__RowMessage, n_old_tuple),
@@ -407,15 +419,16 @@ static const ProtobufCFieldDescriptor decoderbufs__row_message__field_descriptor
 };
 static const unsigned decoderbufs__row_message__field_indices_by_name[] = {
   0,   /* field[0] = commit_time */
-  3,   /* field[3] = new_tuple */
-  4,   /* field[4] = old_tuple */
-  2,   /* field[2] = op */
-  1,   /* field[1] = table */
+  1,   /* field[1] = log_position */
+  4,   /* field[4] = new_tuple */
+  5,   /* field[5] = old_tuple */
+  3,   /* field[3] = op */
+  2,   /* field[2] = table */
 };
 static const ProtobufCIntRange decoderbufs__row_message__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 5 }
+  { 0, 6 }
 };
 const ProtobufCMessageDescriptor decoderbufs__row_message__descriptor =
 {
@@ -425,14 +438,14 @@ const ProtobufCMessageDescriptor decoderbufs__row_message__descriptor =
   "Decoderbufs__RowMessage",
   "decoderbufs",
   sizeof(Decoderbufs__RowMessage),
-  5,
+  6,
   decoderbufs__row_message__field_descriptors,
   decoderbufs__row_message__field_indices_by_name,
   1,  decoderbufs__row_message__number_ranges,
   (ProtobufCMessageInit) decoderbufs__row_message__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-const ProtobufCEnumValue decoderbufs__op__enum_values_by_number[3] =
+static const ProtobufCEnumValue decoderbufs__op__enum_values_by_number[3] =
 {
   { "INSERT", "DECODERBUFS__OP__INSERT", 0 },
   { "UPDATE", "DECODERBUFS__OP__UPDATE", 1 },
@@ -441,7 +454,7 @@ const ProtobufCEnumValue decoderbufs__op__enum_values_by_number[3] =
 static const ProtobufCIntRange decoderbufs__op__value_ranges[] = {
 {0, 0},{0, 3}
 };
-const ProtobufCEnumValueIndex decoderbufs__op__enum_values_by_name[3] =
+static const ProtobufCEnumValueIndex decoderbufs__op__enum_values_by_name[3] =
 {
   { "DELETE", 2 },
   { "INSERT", 0 },

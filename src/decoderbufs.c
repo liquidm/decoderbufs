@@ -526,6 +526,8 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
   /* set common fields */
   rmsg.commit_time = TIMESTAMPTZ_TO_USEC_SINCE_EPOCH(txn->commit_time);
   rmsg.has_commit_time = true;
+  rmsg.log_position = txn->end_lsn;
+  rmsg.has_log_position = true;
   rmsg.table = pstrdup(NameStr(class_form->relname));
 
   /* decode different operation types */
