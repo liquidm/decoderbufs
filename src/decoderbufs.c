@@ -53,12 +53,6 @@
 #include "utils/uuid.h"
 #include "proto/pg_logicaldec.pb-c.h"
 
-#ifdef WITH_POSTGIS
-/* POSTGIS version define so it doesn't redef macros */
-#define POSTGIS_PGSQL_VERSION 94
-#include "libpgcommon/lwgeom_pg.h"
-#endif
-
 PG_MODULE_MAGIC;
 
 /* define a time macro to convert TimestampTz into something more sane,
@@ -77,11 +71,6 @@ typedef struct {
   bool debug_mode;
 } DecoderData;
 
-#ifdef WITH_POSTGIS
-/* GLOBALs for PostGIS dynamic OIDs */
-Oid geometry_oid = InvalidOid;
-Oid geography_oid = InvalidOid;
-#endif
 
 /* these must be available to pg_dlsym() */
 extern void _PG_init(void);
@@ -167,22 +156,6 @@ static void pg_decode_shutdown(LogicalDecodingContext *ctx) {
 /* BEGIN callback */
 static void pg_decode_begin_txn(LogicalDecodingContext *ctx,
                                 ReorderBufferTXN *txn) {
-#ifdef WITH_POSTGIS
-  // set PostGIS geometry type id (these are dynamic)
-  // TODO: Figure out how to make sure we get the typid's from postgis extension namespace
-  if (geometry_oid == InvalidOid) {
-    geometry_oid = TypenameGetTypid("geometry");
-    if (geometry_oid != InvalidOid) {
-      elog(DEBUG1, "PostGIS geometry type detected: %u", geometry_oid);
-    }
-  }
-  if (geography_oid == InvalidOid) {
-    geography_oid = TypenameGetTypid("geography");
-    if (geography_oid != InvalidOid) {
-      elog(DEBUG1, "PostGIS geometry type detected: %u", geography_oid);
-    }
-  }
-#endif
 }
 
 /* COMMIT callback */
@@ -275,17 +248,6 @@ static void print_tuple_msg(StringInfo out, Decoderbufs__DatumMessage **tup,
                              dmsg->datum_point->x, dmsg->datum_point->y);
             break;
           default:
-#ifdef WITH_POSTGIS
-            if (dmsg->column_type == geometry_oid &&
-                dmsg->datum_point != NULL) {
-              appendStringInfo(out, ", datum[GEOMETRY(POINT(%f,%f))]",
-                               dmsg->datum_point->x, dmsg->datum_point->y);
-            } else if (dmsg->column_type == geography_oid &&
-                       dmsg->datum_point != NULL) {
-              appendStringInfo(out, ", datum[GEOGRAPHY(POINT(%f,%f))]",
-                               dmsg->datum_point->x, dmsg->datum_point->y);
-            }
-#endif
             break;
         }
         appendStringInfo(out, "\n");
@@ -317,39 +279,6 @@ static double numeric_to_double_no_overflow(Numeric num) {
   return val;
 }
 
-#ifdef WITH_POSTGIS
-static bool geography_point_as_decoderbufs_point(Datum datum,
-                                                 Decoderbufs__Point *p) {
-  GSERIALIZED *geom;
-  LWGEOM *lwgeom;
-  LWPOINT *point = NULL;
-  POINT2D p2d;
-
-  geom = (GSERIALIZED *)PG_DETOAST_DATUM(datum);
-  if (gserialized_get_type(geom) != POINTTYPE) {
-    return false;
-  }
-
-  lwgeom = lwgeom_from_gserialized(geom);
-  point = lwgeom_as_lwpoint(lwgeom);
-  if (lwgeom_is_empty(lwgeom)) {
-    return false;
-  }
-
-  getPoint2d_p(point->point, 0, &p2d);
-
-  if (p != NULL) {
-    Decoderbufs__Point dp = DECODERBUFS__POINT__INIT;
-    dp.x = p2d.x;
-    dp.y = p2d.y;
-    memcpy(p, &dp, sizeof(dp));
-    elog(DEBUG1, "Translating geography to point: (x,y) = (%f,%f)", p->x, p->y);
-  }
-
-  return true;
-}
-#endif
-
 /* set a datum value based on its OID specified by typid */
 static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
                             Oid typoutput, Datum datum) {
@@ -358,6 +287,7 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
   const char *output;
   Point *p;
   int size = 0;
+
   switch (typid) {
     case BOOLOID:
       datum_msg->datum_bool = DatumGetBool(datum);
@@ -426,34 +356,24 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
       memcpy(datum_msg->datum_point, &dp, sizeof(dp));
       break;
     default:
-#ifdef WITH_POSTGIS
-      // PostGIS uses dynamic OIDs so we need to check the type again here
-      if (typid == geometry_oid || typid == geography_oid) {
-        elog(DEBUG1, "Converting geography point to datum_point");
-        datum_msg->datum_point = palloc(sizeof(Decoderbufs__Point));
-        geography_point_as_decoderbufs_point(datum, datum_msg->datum_point);
-      } else {
-#endif
-        elog(DEBUG1, "Encountered unknown typid: %d, using bytes", typid);
-        output = OidOutputFunctionCall(typoutput, datum);
-        int len = strlen(output);
-        size = sizeof(char) * len;
-        datum_msg->datum_bytes.data = palloc(size);
-        memcpy(datum_msg->datum_bytes.data, (uint8_t *)output, size);
-        datum_msg->datum_bytes.len = len;
-        datum_msg->has_datum_bytes = true;
-#ifdef WITH_POSTGIS
-      }
-#endif
+      elog(DEBUG1, "Encountered unknown typid: %d, using bytes", typid);
+      output = OidOutputFunctionCall(typoutput, datum);
+      int len = strlen(output);
+      size = sizeof(char) * len;
+      datum_msg->datum_bytes.data = palloc(size);
+      memcpy(datum_msg->datum_bytes.data, (uint8_t *)output, size);
+      datum_msg->datum_bytes.len = len;
+      datum_msg->has_datum_bytes = true;
       break;
   }
 }
 
 /* convert a PG tuple to an array of DatumMessage(s) */
-static void tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
+static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
                                Relation relation, HeapTuple tuple,
                                TupleDesc tupdesc) {
   int natt;
+  int skipped = 0;
 
   /* build column names and values */
   for (natt = 0; natt < tupdesc->natts; natt++) {
@@ -465,6 +385,7 @@ static void tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
 
     /* skip dropped columns and system columns */
     if (attr->attisdropped || attr->attnum < 0) {
+      skipped++;
       continue;
     }
 
@@ -499,6 +420,7 @@ static void tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
     tmsg[natt] = palloc(sizeof(datum_msg));
     memcpy(tmsg[natt], &datum_msg, sizeof(datum_msg));
   }
+  return skipped;
 }
 
 /* callback for individual changed tuples */
@@ -540,7 +462,7 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
         rmsg.n_new_tuple = tupdesc->natts;
         rmsg.new_tuple =
             palloc(sizeof(Decoderbufs__DatumMessage*) * tupdesc->natts);
-        tuple_to_tuple_msg(rmsg.new_tuple, relation,
+        rmsg.n_new_tuple -= tuple_to_tuple_msg(rmsg.new_tuple, relation,
                            &change->data.tp.newtuple->tuple, tupdesc);
       }
       break;
@@ -553,7 +475,7 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
           rmsg.n_old_tuple = tupdesc->natts;
           rmsg.old_tuple =
               palloc(sizeof(Decoderbufs__DatumMessage*) * tupdesc->natts);
-          tuple_to_tuple_msg(rmsg.old_tuple, relation,
+          rmsg.n_old_tuple -= tuple_to_tuple_msg(rmsg.old_tuple, relation,
                              &change->data.tp.oldtuple->tuple, tupdesc);
         }
         if (change->data.tp.newtuple != NULL) {
@@ -561,7 +483,7 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
           rmsg.n_new_tuple = tupdesc->natts;
           rmsg.new_tuple =
               palloc(sizeof(Decoderbufs__DatumMessage*) * tupdesc->natts);
-          tuple_to_tuple_msg(rmsg.new_tuple, relation,
+          rmsg.n_new_tuple -= tuple_to_tuple_msg(rmsg.new_tuple, relation,
                              &change->data.tp.newtuple->tuple, tupdesc);
         }
       }
@@ -575,7 +497,7 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
         rmsg.n_old_tuple = tupdesc->natts;
         rmsg.old_tuple =
             palloc(sizeof(Decoderbufs__DatumMessage*) * tupdesc->natts);
-        tuple_to_tuple_msg(rmsg.old_tuple, relation,
+        rmsg.n_old_tuple -= tuple_to_tuple_msg(rmsg.old_tuple, relation,
                            &change->data.tp.oldtuple->tuple, tupdesc);
       }
       break;
