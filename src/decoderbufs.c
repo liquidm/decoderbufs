@@ -434,7 +434,7 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
         geography_point_as_decoderbufs_point(datum, datum_msg->datum_point);
       } else {
 #endif
-        elog(WARNING, "Encountered unknown typid: %d, using bytes", typid);
+        elog(DEBUG1, "Encountered unknown typid: %d, using bytes", typid);
         output = OidOutputFunctionCall(typoutput, datum);
         int len = strlen(output);
         size = sizeof(char) * len;
