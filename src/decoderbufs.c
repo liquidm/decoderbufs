@@ -374,6 +374,7 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
                                TupleDesc tupdesc) {
   int natt;
   int skipped = 0;
+  int i = 0;
 
   /* build column names and values */
   for (natt = 0; natt < tupdesc->natts; natt++) {
@@ -417,8 +418,9 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
       }
     }
 
-    tmsg[natt] = palloc(sizeof(datum_msg));
-    memcpy(tmsg[natt], &datum_msg, sizeof(datum_msg));
+    tmsg[i] = palloc(sizeof(datum_msg));
+    memcpy(tmsg[i], &datum_msg, sizeof(datum_msg));
+    i++;
   }
   return skipped;
 }
