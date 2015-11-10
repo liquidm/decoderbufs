@@ -328,8 +328,7 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
     case JSONOID:
     case XMLOID:
     case UUIDOID:
-      output = OidOutputFunctionCall(typoutput, datum);
-      datum_msg->datum_string = pnstrdup(output, strlen(output));
+      datum_msg->datum_string = TextDatumGetCString(datum);
       break;
     case TIMESTAMPOID:
     /*
@@ -356,7 +355,6 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
       memcpy(datum_msg->datum_point, &dp, sizeof(dp));
       break;
     default:
-      elog(DEBUG1, "Encountered unknown typid: %d, using bytes", typid);
       output = OidOutputFunctionCall(typoutput, datum);
       int len = strlen(output);
       size = sizeof(char) * len;
@@ -407,15 +405,7 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
     /* query output function */
     getTypeOutputInfo(attr->atttypid, &typoutput, &typisvarlena);
     if (!isnull) {
-      if (typisvarlena && VARATT_IS_EXTERNAL_ONDISK(origval)) {
-        // TODO: Is there a way we can handle this?
-        elog(WARNING, "Not handling external on disk varlena at the moment.");
-      } else if (!typisvarlena) {
-        set_datum_value(&datum_msg, attr->atttypid, typoutput, origval);
-      } else {
-        Datum val = PointerGetDatum(PG_DETOAST_DATUM(origval));
-        set_datum_value(&datum_msg, attr->atttypid, typoutput, val);
-      }
+      set_datum_value(&datum_msg, attr->atttypid, typoutput, origval);
     }
 
     tmsg[i] = palloc(sizeof(datum_msg));
