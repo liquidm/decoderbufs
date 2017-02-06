@@ -1,0 +1,5 @@
+FROM postgres:9.4
+RUN apt-get update -y && apt-get install -y --no-install-recommends postgresql postgresql-server-dev-9.4 build-essential pkg-config protobuf-compiler libprotobuf-c-dev
+COPY ./ /decoderbufs
+WORKDIR /decoderbufs
+RUN make && make install && rm -rf /decoderbufs
