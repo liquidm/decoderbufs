@@ -405,7 +405,15 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
     /* query output function */
     getTypeOutputInfo(attr->atttypid, &typoutput, &typisvarlena);
     if (!isnull) {
-      set_datum_value(&datum_msg, attr->atttypid, typoutput, origval);
+      if (typisvarlena && VARATT_IS_EXTERNAL_ONDISK(origval)) {
+         datum_msg.unchanged_no_value = true;
+         datum_msg.has_unchanged_no_value = true;
+       } else if (!typisvarlena) {
+         set_datum_value(&datum_msg, attr->atttypid, typoutput, origval);
+       } else {
+         Datum val = PointerGetDatum(PG_DETOAST_DATUM(origval));
+         set_datum_value(&datum_msg, attr->atttypid, typoutput, val);
+       }
     }
 
     tmsg[i] = palloc(sizeof(datum_msg));
