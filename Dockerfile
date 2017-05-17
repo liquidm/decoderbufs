@@ -1,13 +1,43 @@
 FROM postgres:9.4
-RUN apt-get update -y && apt-get install -y --no-install-recommends postgresql postgresql-server-dev-9.4 build-essential pkg-config protobuf-compiler libprotobuf-c-dev
-COPY ./ /decoderbufs
-WORKDIR /decoderbufs
-RUN make && make install && rm -rf /decoderbufs
-RUN echo "shared_preload_libraries = 'decoderbufs'" >>/usr/share/postgresql/postgresql.conf.sample
-RUN echo "wal_level = logical" >>/usr/share/postgresql/postgresql.conf.sample
-RUN echo "max_wal_senders = 8" >>/usr/share/postgresql/postgresql.conf.sample
-RUN echo "wal_keep_segments = 4" >>/usr/share/postgresql/postgresql.conf.sample
-RUN echo "max_replication_slots = 4" >>/usr/share/postgresql/postgresql.conf.sample
-RUN echo "local  replication all trust" >>/usr/share/postgresql/9.4//pg_hba.conf.sample
-RUN echo "host   replication all 0.0.0/0 trust" >>/usr/share/postgresql/9.4/pg_hba.conf.sample
-RUN echo "host   replication all ::/0 trust" >>/usr/share/postgresql/9.4/pg_hba.conf.sample
+
+ENV WORKDIR /decoderbufs
+ENV PSQLDIR /usr/share/postgresql/9.4
+
+WORKDIR $WORKDIR
+
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+      build-essential \
+      libprotobuf-c-dev \
+      pkg-config \
+      postgresql \
+      postgresql-server-dev-9.4 \
+      protobuf-compiler
+
+COPY . .
+
+RUN make && make install && rm -rf $WORKDIR
+
+RUN apt-get purge -y \
+      build-essential \
+      libprotobuf-c-dev \
+      pkg-config \
+      postgresql \
+      postgresql-server-dev-9.4 \
+      protobuf-compiler
+
+RUN echo "\n\
+    shared_preload_libraries = 'decoderbufs' \n\
+    wal_level = logical \n\
+    max_wal_senders = 8 \n\
+    wal_keep_segments = 4 \n\
+    max_replication_slots = 4 \n\
+    " >> $PSQLDIR/postgresql.conf.sample && \
+    echo "\n\
+    local  replication all trust \n\
+    host   replication all 0.0.0/0 trust \n\
+    host   replication all ::/0 trust \n\
+    " >> $PSQLDIR/pg_hba.conf.sample
+
+HEALTHCHECK --interval=1m --timeout=5s \
+  CMD psql -U postgres "dbname=postgres replication=database" -c "IDENTIFY_SYSTEM;" || exit 1
