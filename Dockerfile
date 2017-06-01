@@ -1,7 +1,7 @@
-FROM postgres:9.4
+FROM postgres:9.6
 
 ENV WORKDIR /decoderbufs
-ENV PSQLDIR /usr/share/postgresql/9.4
+ENV PSQLDIR /usr/share/postgresql/9.6
 
 WORKDIR $WORKDIR
 
@@ -11,7 +11,7 @@ RUN apt-get update -y && \
       libprotobuf-c-dev \
       pkg-config \
       postgresql \
-      postgresql-server-dev-9.4 \
+      postgresql-server-dev-9.6 \
       protobuf-compiler
 
 COPY . .
@@ -23,7 +23,7 @@ RUN apt-get purge -y \
       libprotobuf-c-dev \
       pkg-config \
       postgresql \
-      postgresql-server-dev-9.4 \
+      postgresql-server-dev-9.6 \
       protobuf-compiler
 
 RUN echo "\n\
