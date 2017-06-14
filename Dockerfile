@@ -3,6 +3,8 @@ FROM postgres:9.6
 ENV WORKDIR /decoderbufs
 ENV PSQLDIR /usr/share/postgresql/9.6
 
+EXPOSE 5432
+
 WORKDIR $WORKDIR
 
 RUN apt-get update -y && \
