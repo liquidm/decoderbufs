@@ -37,6 +37,10 @@ RUN echo "\n\
     max_replication_slots = 4 \n\
     " >> $PSQL_CONFIG_DIR/postgresql.conf && \
     echo "\n\
+    local  all all trust \n\
+    host   all all 0.0.0.0/0 trust \n\
+    host   all all 127.0.0.1/0 trust \n\
+    host   all all ::/0 trust \n\
     local  replication all trust \n\
     host   replication all 0.0.0.0/0 trust \n\
     host   replication all 127.0.0.1/0 trust \n\
