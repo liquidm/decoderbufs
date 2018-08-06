@@ -182,7 +182,7 @@ static void row_message_destroy(Decoderbufs__RowMessage *msg) {
         }
         else if (msg->new_tuple[i]->datum_point) {
           pfree(msg->new_tuple[i]->datum_point);
-        }     
+        }
         pfree(msg->new_tuple[i]);
       }
     }
@@ -426,14 +426,22 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
 /* callback for individual changed tuples */
 static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
                              Relation relation, ReorderBufferChange *change) {
+
+
+  Form_pg_class class_form;
+  class_form = RelationGetForm(relation);
+
+  if (strstr(pstrdup(NameStr(class_form->relname)), "pg_temp_")) {
+    return;
+  }
+
   DecoderData *data;
   MemoryContext old;
 
-  Form_pg_class class_form;
   char replident = relation->rd_rel->relreplident;
   bool is_rel_non_selective;
+
   Decoderbufs__RowMessage rmsg = DECODERBUFS__ROW_MESSAGE__INIT;
-  class_form = RelationGetForm(relation);
 
   data = ctx->output_plugin_private;
 
@@ -451,6 +459,7 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
   rmsg.log_position = txn->end_lsn;
   rmsg.has_log_position = true;
   rmsg.table = pstrdup(NameStr(class_form->relname));
+
 
   /* decode different operation types */
   switch (change->action) {
