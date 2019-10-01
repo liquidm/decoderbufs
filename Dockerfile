@@ -1,7 +1,7 @@
-FROM liquidm/docker-postgresql:9.6
+FROM liquidm/docker-postgresql:11
 
 ENV WORKDIR /decoderbufs
-ENV PSQL_CONFIG_DIR /etc/postgresql/9.6/main
+ENV PSQL_CONFIG_DIR /etc/postgresql/11/main
 
 ENV DB_USER=postgres
 ENV DB_PASS=postgres
@@ -15,7 +15,7 @@ RUN apt-get update -y && \
       build-essential \
       libprotobuf-c-dev \
       pkg-config \
-      postgresql-server-dev-9.6 \
+      postgresql-server-dev-11 \
       protobuf-compiler
 
 COPY . .
@@ -26,7 +26,7 @@ RUN apt-get purge -y \
       build-essential \
       libprotobuf-c-dev \
       pkg-config \
-      postgresql-server-dev-9.6 \
+      postgresql-server-dev-11 \
       protobuf-compiler
 
 RUN echo "\n\
