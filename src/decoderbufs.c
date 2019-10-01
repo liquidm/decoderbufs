@@ -101,10 +101,10 @@ void _PG_output_plugin_init(OutputPluginCallbacks *cb) {
 /* initialize this plugin */
 static void pg_decode_startup(LogicalDecodingContext *ctx,
                               OutputPluginOptions *opt, bool is_init) {
-  elog(INFO, "Entering startup callback");
-
   ListCell *option;
   DecoderData *data;
+
+  elog(INFO, "Entering startup callback");
 
   data = palloc(sizeof(DecoderData));
   data->context = AllocSetContextCreate(
@@ -286,7 +286,9 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
   bytea *valptr;
   const char *output;
   Point *p;
+  Decoderbufs__Point dp = DECODERBUFS__POINT__INIT;
   int size = 0;
+  int len = 0;
 
   switch (typid) {
     case BOOLOID:
@@ -348,7 +350,6 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
       break;
     case POINTOID:
       p = DatumGetPointP(datum);
-      Decoderbufs__Point dp = DECODERBUFS__POINT__INIT;
       dp.x = p->x;
       dp.y = p->y;
       datum_msg->datum_point = palloc(sizeof(Decoderbufs__Point));
@@ -356,7 +357,7 @@ static void set_datum_value(Decoderbufs__DatumMessage *datum_msg, Oid typid,
       break;
     default:
       output = OidOutputFunctionCall(typoutput, datum);
-      int len = strlen(output);
+      len = strlen(output);
       size = sizeof(char) * len;
       datum_msg->datum_bytes.data = palloc(size);
       memcpy(datum_msg->datum_bytes.data, (uint8_t *)output, size);
@@ -373,12 +374,16 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
   int natt;
   int skipped = 0;
   int i = 0;
+  bool isnull;
+  Decoderbufs__DatumMessage datum_msg = DECODERBUFS__DATUM_MESSAGE__INIT;
+  Oid typoutput;
+  bool typisvarlena;
 
   /* build column names and values */
   for (natt = 0; natt < tupdesc->natts; natt++) {
     Form_pg_attribute attr;
     Datum origval;
-    bool isnull;
+    isnull = false;
 
     attr = tupdesc->attrs[natt];
 
@@ -388,7 +393,7 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
       continue;
     }
 
-    Decoderbufs__DatumMessage datum_msg = DECODERBUFS__DATUM_MESSAGE__INIT;
+    datum_msg = DECODERBUFS__DATUM_MESSAGE__INIT;
 
     /* set the column name */
     datum_msg.column_name = NameStr(attr->attname);
@@ -400,8 +405,6 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
     datum_msg.column_type = attr->atttypid;
     datum_msg.has_column_type = true;
 
-    Oid typoutput;
-    bool typisvarlena;
     /* query output function */
     getTypeOutputInfo(attr->atttypid, &typoutput, &typisvarlena);
     if (!isnull) {
@@ -428,6 +431,12 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
                              Relation relation, ReorderBufferChange *change) {
 
 
+  DecoderData *data;
+  MemoryContext old;
+  size_t psize;
+  void *packed;
+  size_t ssize;
+  uint64_t flen;
   Form_pg_class class_form;
   class_form = RelationGetForm(relation);
 
@@ -435,8 +444,6 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
     return;
   }
 
-  DecoderData *data;
-  MemoryContext old;
 
   char replident = relation->rd_rel->relreplident;
   bool is_rel_non_selective;
@@ -536,10 +543,10 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
     OutputPluginWrite(ctx, true);
   } else {
     OutputPluginPrepareWrite(ctx, true);
-    size_t psize = decoderbufs__row_message__get_packed_size(&rmsg);
-    void *packed = palloc(psize);
-    size_t ssize = decoderbufs__row_message__pack(&rmsg, packed);
-    uint64_t flen = htobe64(ssize);
+    psize = decoderbufs__row_message__get_packed_size(&rmsg);
+    *packed = palloc(psize);
+    ssize = decoderbufs__row_message__pack(&rmsg, packed);
+    flen = htobe64(ssize);
     /* frame encoding size */
     appendBinaryStringInfo(ctx->out, (char *)&flen, sizeof(flen));
     /* frame encoding payload */
