@@ -385,15 +385,13 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
     Datum origval;
     isnull = false;
 
-    attr = tupdesc->attrs[natt];
+    attr = TupleDescAttr(tupdesc, natt);
 
     /* skip dropped columns and system columns */
     if (attr->attisdropped || attr->attnum < 0) {
       skipped++;
       continue;
     }
-
-    datum_msg = DECODERBUFS__DATUM_MESSAGE__INIT;
 
     /* set the column name */
     datum_msg.column_name = NameStr(attr->attname);
@@ -437,18 +435,16 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
   void *packed;
   size_t ssize;
   uint64_t flen;
+  bool is_rel_non_selective;
+  char replident;
   Form_pg_class class_form;
-  class_form = RelationGetForm(relation);
+  Decoderbufs__RowMessage rmsg = DECODERBUFS__ROW_MESSAGE__INIT;
 
+  /* Skip temporary tables */
+  class_form = RelationGetForm(relation);
   if (strstr(pstrdup(NameStr(class_form->relname)), "pg_temp_")) {
     return;
   }
-
-
-  char replident = relation->rd_rel->relreplident;
-  bool is_rel_non_selective;
-
-  Decoderbufs__RowMessage rmsg = DECODERBUFS__ROW_MESSAGE__INIT;
 
   data = ctx->output_plugin_private;
 
@@ -456,6 +452,7 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
   old = MemoryContextSwitchTo(data->context);
 
   RelationGetIndexList(relation);
+  replident = relation->rd_rel->relreplident;
   is_rel_non_selective = (replident == REPLICA_IDENTITY_NOTHING ||
                           (replident == REPLICA_IDENTITY_DEFAULT &&
                            !OidIsValid(relation->rd_replidindex)));
@@ -544,7 +541,7 @@ static void pg_decode_change(LogicalDecodingContext *ctx, ReorderBufferTXN *txn,
   } else {
     OutputPluginPrepareWrite(ctx, true);
     psize = decoderbufs__row_message__get_packed_size(&rmsg);
-    *packed = palloc(psize);
+    packed = palloc(psize);
     ssize = decoderbufs__row_message__pack(&rmsg, packed);
     flen = htobe64(ssize);
     /* frame encoding size */
