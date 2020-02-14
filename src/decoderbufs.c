@@ -107,9 +107,14 @@ static void pg_decode_startup(LogicalDecodingContext *ctx,
   elog(INFO, "Entering startup callback");
 
   data = palloc(sizeof(DecoderData));
+#if PG_VERSION_NUM >= 90600
+  data->context = AllocSetContextCreate(
+      ctx->context, "decoderbufs context", ALLOCSET_DEFAULT_SIZES);
+#else
   data->context = AllocSetContextCreate(
       ctx->context, "decoderbufs context", ALLOCSET_DEFAULT_MINSIZE,
       ALLOCSET_DEFAULT_INITSIZE, ALLOCSET_DEFAULT_MAXSIZE);
+#endif
   data->debug_mode = false;
   opt->output_type = OUTPUT_PLUGIN_BINARY_OUTPUT;
 
