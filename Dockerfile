@@ -1,7 +1,7 @@
-FROM liquidm/docker-postgresql:9.6
+FROM registry.lqm.io/postgresql:13
 
 ENV WORKDIR /decoderbufs
-ENV PSQL_CONFIG_DIR /etc/postgresql/9.6/main
+ENV PSQL_CONFIG_DIR /etc/postgresql/13/main
 
 ENV DB_USER=postgres
 ENV DB_PASS=postgres
@@ -15,25 +15,25 @@ RUN apt-get update -y && \
       build-essential \
       libprotobuf-c-dev \
       pkg-config \
-      postgresql-server-dev-9.6 \
+      postgresql-server-dev-13 \
       protobuf-compiler
 
 COPY . .
 
-RUN make && make install && rm -rf $WORKDIR
+RUN export PATH=/usr/lib/postgresql/13/bin:$PATH; make && make install
 
 RUN apt-get purge -y \
       build-essential \
       libprotobuf-c-dev \
       pkg-config \
-      postgresql-server-dev-9.6 \
+      postgresql-server-dev-13 \
       protobuf-compiler
 
 RUN echo "\n\
     shared_preload_libraries = 'decoderbufs' \n\
     wal_level = logical \n\
     max_wal_senders = 8 \n\
-    wal_keep_segments = 4 \n\
+    wal_keep_size = 64 \n\
     max_replication_slots = 4 \n\
     " >> $PSQL_CONFIG_DIR/postgresql.conf && \
     echo "\n\
