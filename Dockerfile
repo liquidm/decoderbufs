@@ -20,7 +20,7 @@ RUN apt-get update -y && \
 
 COPY . .
 
-RUN make && make install && rm -rf $WORKDIR
+RUN export PATH=/usr/lib/postgresql/13/bin:$PATH; make && make install
 
 RUN apt-get purge -y \
       build-essential \
