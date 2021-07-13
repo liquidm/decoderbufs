@@ -33,7 +33,7 @@ RUN echo "\n\
     shared_preload_libraries = 'decoderbufs' \n\
     wal_level = logical \n\
     max_wal_senders = 8 \n\
-    wal_keep_segments = 4 \n\
+    wal_keep_size = 64 \n\
     max_replication_slots = 4 \n\
     " >> $PSQL_CONFIG_DIR/postgresql.conf && \
     echo "\n\
