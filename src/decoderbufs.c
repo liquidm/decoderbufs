@@ -380,7 +380,7 @@ static int tuple_to_tuple_msg(Decoderbufs__DatumMessage **tmsg,
     Datum origval;
     bool isnull;
 
-    attr = tupdesc->attrs[natt];
+    attr = TupleDescAttr(tupdesc, natt);
 
     /* skip dropped columns and system columns */
     if (attr->attisdropped || attr->attnum < 0) {
